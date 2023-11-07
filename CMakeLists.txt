@@ -28,3 +28,11 @@ if(BUILD_TESTING)
 endif()
 
 ament_package()
+#cp8
+add_executable(chase_node src/robot_chase.cpp)
+ament_target_dependencies(chase_node rclcpp std_msgs geometry_msgs nav_msgs sensor_msgs tf2 tf2_ros)
+
+install(TARGETS
+   chase_node
+   DESTINATION lib/${PROJECT_NAME}
+)
