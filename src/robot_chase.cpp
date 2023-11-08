@@ -65,16 +65,7 @@ private:
     error_direction_ = calculate_tf_direction(translation, false, true);
 
     //3rd perform the movement
-    /*orientation control: 
-    -control variable : direction defined by the vector between the two robots
-    -desired variable : values close to 0
-    */
-    pub_msg_.angular.z = kp_yaw_ * error_direction_;
-    //distance control
-    //pub_msg_.linear.x = kp_distance_ * error_distance_;
-    //publish the message
-    publisher_->publish(pub_msg_);
-
+    control_algorithm();
   }
 
   double calculate_tf_yaw(geometry_msgs::msg::Quaternion rotation,
@@ -136,6 +127,29 @@ private:
     }
 
     return std::make_tuple(translation, rotation);
+  }
+
+  template <typename T>
+  T saturate(T var, T min, T max) {
+    if (var > max) {
+      return max;
+    } else if (var < min) {
+      return min;
+    } else {
+      return var;
+    }
+  }
+
+  void control_algorithm() {
+    /*orientation control: 
+    -control variable : direction defined by the vector between the two robots
+    -desired variable : values close to 0
+    */
+    pub_msg_.angular.z = saturate(kp_yaw_ * error_direction_, -MAX_ANGULAR_SPEED_, MAX_ANGULAR_SPEED_);
+    //distance control
+    pub_msg_.linear.x = saturate(kp_distance_ * error_distance_, -MAX_LINEAR_SPEED_, MAX_LINEAR_SPEED_);
+    //publish the message
+    publisher_->publish(pub_msg_);
   }
 };
 
