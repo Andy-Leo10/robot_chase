@@ -16,48 +16,47 @@
 class RobotChase : public rclcpp::Node
 {
 public:
-    RobotChase(const std::string &origin_frame, const std::string &destiny_frame) : Node("robot_chase"), TIMER_PERIOD_(0.05), kp_distance_(0.5), kp_yaw_(0.5)
+    RobotChase(const std::string &origin_frame, const std::string &destiny_frame) : Node("robot_chase"), TIMER_PERIOD_(0.05), kp_distance_(0.5), kp_yaw_(0.5), MAX_LINEAR_SPEED_(0.5), MAX_ANGULAR_SPEED_(0.5)
     {
+        // initialize the tf2 listener
         auto clock = this->get_clock();
         tf_buffer_ = std::make_shared<tf2_ros::Buffer>(clock);
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-
-        timer_period_ms = static_cast<int>(1.0 / TIMER_PERIOD_);
-        timer_ = create_wall_timer(std::chrono::milliseconds(timer_period_ms), std::bind(&RobotChase::timer_callback, this));
-
         origin_frame_ = origin_frame;
         destiny_frame_ = destiny_frame;
+        // initialize the timer
+        timer_period_ms = static_cast<int>(1.0 / TIMER_PERIOD_);
+        timer_ = create_wall_timer(std::chrono::milliseconds(timer_period_ms), std::bind(&RobotChase::timer_callback, this));
+        // publisher to cmd_vel
+        publisher = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
     }
 
 private:
-    rclcpp::TimerBase::SharedPtr timer_;
+    // tf2 listener variables
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    std::string origin_frame_, destiny_frame_;
+    // timer variables
+    rclcpp::TimerBase::SharedPtr timer_;
     const float TIMER_PERIOD_;
     int timer_period_ms;
+    // publisher variables
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_;
+    geometry_msgs::msg::Twist pub_msg_;
+    const float MAX_LINEAR_SPEED_;
+    const float MAX_ANGULAR_SPEED_;
+    // control variables
     float error_distance_, error_yaw_, error_direction_;
     const float kp_distance_;
     const float kp_yaw_;
-    std::string origin_frame_, destiny_frame_;
+    
 
     void timer_callback()
     {
         // 1st get the transform
-        geometry_msgs::msg::TransformStamped transformStamped;
         geometry_msgs::msg::Vector3 translation;
         geometry_msgs::msg::Quaternion rotation;
-
-        try
-        {
-            transformStamped = tf_buffer_->lookupTransform(origin_frame_, destiny_frame_, tf2::TimePointZero);
-            translation = transformStamped.transform.translation;
-            rotation = transformStamped.transform.rotation;
-        }
-        catch (tf2::TransformException &ex)
-        {
-            RCLCPP_WARN(this->get_logger(), "Could not transform %s to %s: %s", origin_frame_, destiny_frame_, ex.what());
-            return;
-        }
+        std::tie(translation, rotation) = get_transform();
 
         // 2nd calculate the distance and angle between the two robots
         error_distance_ = calculate_tf_distance(translation, true);
@@ -108,6 +107,26 @@ private:
             RCLCPP_INFO(this->get_logger(), "direction between frames: %.2f", direction);
         }
         return direction;
+    }
+
+    std::tuple<geometry_msgs::msg::Vector3, geometry_msgs::msg::Quaternion> get_transform()
+    {
+        geometry_msgs::msg::TransformStamped transformStamped;
+        geometry_msgs::msg::Vector3 translation;
+        geometry_msgs::msg::Quaternion rotation;
+
+        try
+        {
+            transformStamped = tf_buffer_->lookupTransform(origin_frame_, destiny_frame_, tf2::TimePointZero);
+            translation = transformStamped.transform.translation;
+            rotation = transformStamped.transform.rotation;
+        }
+        catch (tf2::TransformException &ex)
+        {
+            RCLCPP_WARN(this->get_logger(), "Could not transform %s to %s: %s", origin_frame_.c_str(), destiny_frame_.c_str(), ex.what());
+        }
+
+        return std::make_tuple(translation, rotation);
     }
 };
 
