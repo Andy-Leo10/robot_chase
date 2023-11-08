@@ -29,9 +29,9 @@ public:
     timer_period_ms = static_cast<int>(1.0 / TIMER_PERIOD_);
     timer_ = create_wall_timer(std::chrono::milliseconds(timer_period_ms),
                                std::bind(&RobotChase::timer_callback, this));
-    // publisher to cmd_vel
+    // publisher to cmd_vel of hunter
     publisher_ =
-        this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
+        this->create_publisher<geometry_msgs::msg::Twist>("rick/cmd_vel", 10);
   }
 
 private:
@@ -60,11 +60,21 @@ private:
     std::tie(translation, rotation) = get_transform();
 
     // 2nd calculate the distance and angle between the two robots
-    error_distance_ = calculate_tf_distance(translation, true);
-    error_yaw_ = calculate_tf_yaw(rotation, true, true);
-    error_direction_ = calculate_tf_direction(translation, true, true);
+    error_distance_ = calculate_tf_distance(translation, false);
+    error_yaw_ = calculate_tf_yaw(rotation, true, false);
+    error_direction_ = calculate_tf_direction(translation, false, true);
 
     //3rd perform the movement
+    /*orientation control: 
+    -control variable : direction defined by the vector between the two robots
+    -desired variable : values close to 0
+    */
+    pub_msg_.angular.z = kp_yaw_ * error_direction_;
+    //distance control
+    //pub_msg_.linear.x = kp_distance_ * error_distance_;
+    //publish the message
+    publisher_->publish(pub_msg_);
+
   }
 
   double calculate_tf_yaw(geometry_msgs::msg::Quaternion rotation,
